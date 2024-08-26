@@ -1,85 +1,80 @@
-import {  createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { createContext, useContext, useState, useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { auth } from "../utils/firebase";
 import LoginVIew from "../components/LoginVIew";
 import { ALERT_TYPE, Dialog, Toast } from "react-native-alert-notification";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import SetNameView from "../components/SetNameView";
 const AuthContext = createContext({
   user: null,
+  token: null,
   setUser: () => {},
   loading: true,
   login: () => {},
   logout: () => {},
-  register: () => {},
+  verifyOtp: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const init = async () => {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          setUser(user);
+      const token = await AsyncStorage.getItem("token");
+
+      if (token) {
+        const res = await fetch(`${API_URL}/verify-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-access-token": token,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          setUser(data.data.user);
+          setToken(token);
           setLoading(false);
-        } else {
-          setUser(null);
-          setLoading(false);
+          return;
         }
-      })
-    }
+      }
+
+      setUser(null);
+      setToken(null);
+      setLoading(false);
+    };
 
     init();
   }, []);
 
-  const login = async (email,password) => {
-    try {
-      const res = await signInWithEmailAndPassword(auth, email, password);
+  const login = async (phone) => {
+    const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-      if (res) {
-        setUser(res.user);
-        Toast.show({
-          type: ALERT_TYPE.SUCCESS,
-          textBody: "Login successful",
-          position: "bottom",
-        })
-
-        return res;
-      }
-    } catch (error) {
-      if (error.code === "auth/user-not-found") {
-        Toast.show({
-          type: ALERT_TYPE.WARNING,
-          textBody: "User not found",
-          position: "bottom",
-          title: "Sign In Error",
-        })
-      }
-
-      if (error.code === "auth/too-many-requests") {
-        Toast.show({
-          type: ALERT_TYPE.WARNING,
-          title: "Sign In Error",
-          textBody: "Too many requests",
-          position: "bottom",
-        })
-      }
-
-      if (error.code === "auth/invalid-credential") {
-        Toast.show({
-          type: ALERT_TYPE.WARNING,
-          title: "Sign In Error",
-          textBody: "Invalid credentials",
-          position: "bottom",
-        })
-      }
-
-     console.log(error);
-     
+    if (phone.startsWith("0")) {
+      phone = `62${phone.slice(1)}`;
     }
+
+    if (!phone.startsWith("0") && !phone.startsWith("62")) {
+      phone = `62${phone}`;
+    }
+
+    const res = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone }),
+    });
+
+    const data = await res.json();
+
+    return data;
   };
 
   const logout = async () => {
@@ -88,54 +83,68 @@ export const AuthProvider = ({ children }) => {
       textBody: "Are you sure you want to log out?",
       button: "Logout",
       onPressButton: async () => {
-        await signOut(auth);
+        await AsyncStorage.removeItem("token");
+        setToken(null);
         setUser(null);
-        Dialog.hide();
-      }
-    })
-  };
-
-  const register = async (email, password, confirmPassword) => {
-    
-    if (password !== confirmPassword) {
-      Toast.show({
-        type: ALERT_TYPE.WARNING,
-        textBody: "Passwords do not match",
-        position: "bottom",
-      })
-      return;
-    }
-
-    if (password.length < 6) {
-      Toast.show({
-        type: ALERT_TYPE.WARNING,
-        textBody: "Password must be at least 6 characters",
-        position: "bottom",
-      })
-      return;
-    }
-
-    try {
-      const res = await createUserWithEmailAndPassword(auth, email, password);
-
-      if (res) {
         Toast.show({
           type: ALERT_TYPE.SUCCESS,
-          textBody: "Account created successfully",
-          position: "bottom",
-        })
-        setUser(res.user);
-      }
-    } catch (error) {
-      if (error.code === "auth/email-already-in-use") {
-        Toast.show({
-          type: ALERT_TYPE.WARNING,
-          textBody: "Email already in use",
-          position: "bottom",
-        })
+          textBody: "Logout success",
+        });
+        Dialog.hide();
+      },
+    });
+  };
+
+  const verifyOtp = async (phone, otp) => {
+    if (phone.startsWith("0")) {
+      phone = `62${phone.slice(1)}`;
+    }
+
+    if (!phone.startsWith("0") && !phone.startsWith("62")) {
+      phone = `62${phone}`;
+    }
+
+    const body = {
+      phone,
+      otp,
+    };
+
+    const res = await fetch(`${API_URL}/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    await AsyncStorage.setItem("token", data.data.token);
+    setToken(data.data.token);
+
+    if (data.success) {
+      setToken(data.data.token);
+      const res = await fetch(`${API_URL}/verify-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": data.data.token,
+        },
+      });
+
+      const data2 = await res.json();
+
+      if (data2.success) {
+        setUser(data2.data.user);
+        return;
       }
     }
-    
+
+    Toast.show({
+      type: ALERT_TYPE.DANGER,
+      title: "Error",
+      textBody: data.message,
+    });
   };
 
   if (loading) {
@@ -146,13 +155,17 @@ export const AuthProvider = ({ children }) => {
     );
   }
 
-  if(!user && !loading) {
-    return <LoginVIew login={login} register={register}/>
+  if (!user && !loading && !token) {
+    return <LoginVIew login={login} verifyOtp={verifyOtp} />;
+  }
+
+  if ((user && user?.name === undefined) || user?.name.length === 0) {
+    return <SetNameView user={user} setUser={setUser} />;
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, setUser, loading, login, logout, register }}
+      value={{ user, setUser, loading, login, logout, token }}
     >
       {children}
     </AuthContext.Provider>

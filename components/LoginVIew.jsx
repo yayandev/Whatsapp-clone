@@ -1,21 +1,79 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, TextInput, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
 import React, { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-
-const TabTwo = ({setTab, login, register}) => {
+import { ALERT_TYPE, Toast } from "react-native-alert-notification";
+import { Ionicons } from "@expo/vector-icons";
+const TabOne = ({ setTab }) => {
   const paddingTop = useSafeAreaInsets().top;
-  const [view, setView] = useState("Sign In");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  return (
+    <View style={[styles.container, { paddingTop: paddingTop }]}>
+      <Text style={styles.title}>Welcome To Whatsapp</Text>
+      <View style={styles.content}>
+        <Image
+          source={require("../assets/images/login.png")}
+          resizeMode="contain"
+          style={styles.image}
+        />
+        <Text style={styles.text}>
+          Read our Privacy Policy. Tap “Agree and continue” to accept the Teams
+          of Service.
+        </Text>
+        <TouchableOpacity style={styles.button} onPress={() => setTab(1)}>
+          <Text style={styles.buttonText}>AGREE AND CONTINUE</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>From</Text>
+        <Text style={styles.footerTitle}>Yayandev</Text>
+      </View>
+    </View>
+  );
+};
+
+const TabTwo = ({ setTab, login, phone, setPhone }) => {
+  const paddingTop = useSafeAreaInsets().top;
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-   await login(email, password);
-  };
+    if (!phone) {
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: "Please enter your phone number",
+      });
+      return;
+    }
 
-  const handleRegister = async () => {
-    await register(email, password, confirmPassword);
+    if (phone.startsWith("0")) {
+      phone = `62${phone.slice(1)}`;
+    }
+
+    setLoading(true);
+
+    const response = await login(phone);
+
+    console.log(response);
+
+    if (response.success) {
+      setTab(2);
+    } else {
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: response.message,
+      });
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -28,82 +86,116 @@ const TabTwo = ({setTab, login, register}) => {
         />
       </View>
       <View style={styles.formLogin}>
-        <Text style={styles.titleFormLogin}>{view}</Text>
+        <Text style={styles.titleFormLogin}>Enter your phone number</Text>
         <TextInput
-          placeholder="Email"
-          keyboardType="email-address"
+          placeholder="Phone number"
+          keyboardType="numeric"
           style={styles.inputFormLogin}
-          onChangeText={(text) => setEmail(text)}
-          value={email}
+          value={phone}
+          onChangeText={(text) => setPhone(text)}
         />
-        <TextInput
-          placeholder="Password"
-          secureTextEntry
-          value={password}
-          onChangeText={(text) => setPassword(text)}
-          style={styles.inputFormLogin}
-        />
-        {view === "Sign Up" && (
-           <TextInput
-           placeholder="Confirm Password"
-           secureTextEntry
-           style={styles.inputFormLogin}
-           onChangeText={(text) => setConfirmPassword(text)}
-           value={confirmPassword}
-         />
-        )}
-        <Pressable onPress={() => setView(view === "Sign In" ? "Sign Up" : "Sign In")}>
-         <Text style={styles.forgotPassword}>
-          {view === "Sign In" ? "Don't have an account?" : "Already have an account?"}
-         </Text>
-        </Pressable>
-        {view === "Sign In" ? (
-          <TouchableOpacity style={styles.buttonFormLogin} onPress={handleLogin}>
-            <Text style={styles.buttonTextFormLogin}>SIGN IN</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.buttonFormLogin} onPress={handleRegister}>
-            <Text style={styles.buttonTextFormLogin}>SIGN UP</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.buttonFormLogin}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text style={styles.buttonTextFormLogin}>NEXT</Text>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
-  )
-}
+  );
+};
 
-const TabOne = ({setTab}) => {
+const TabThree = ({ verifyOtp, phone, setTab }) => {
+  const [loading, setLoading] = useState(false);
   const paddingTop = useSafeAreaInsets().top;
+  const [otp, setOtp] = useState("");
+
+  const handleVerify = async () => {
+    if (!otp) {
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: "Please enter your otp code",
+      });
+      return;
+    }
+
+    if (phone.startsWith("0")) {
+      phone = `62${phone.slice(1)}`;
+    }
+
+    setLoading(true);
+    await verifyOtp(phone, otp);
+    setLoading(false);
+  };
+
   return (
     <View style={[styles.container, { paddingTop: paddingTop }]}>
-    <Text style={styles.title}>Welcome To Whatsapp</Text>
-    <View style={styles.content}>
-      <Image
-        source={require("../assets/images/login.png")}
-        resizeMode="contain"
-        style={styles.image}
-      />
-      <Text style={styles.text}>
-      Read our Privacy Policy. Tap “Agree and continue” to 
-      accept the Teams of Service.
-      </Text>
-      <TouchableOpacity style={styles.button} onPress={() => setTab(1)}>
-        <Text style={styles.buttonText}>AGREE AND CONTINUE</Text>
+      <Pressable
+        style={{
+          alignSelf: "flex-start",
+          paddingLeft: 20,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+        }}
+        onPress={() => setTab(1)}
+      >
+        <Ionicons name="arrow-back" size={24} color="black" />
+        <Text style={styles.titleTop}>Enter OTP Code</Text>
+      </Pressable>
+      <View style={styles.content}>
+        <TextInput
+          style={[styles.inputFormLogin, { textAlign: "center" }]}
+          placeholder="Enter OTP Code"
+          keyboardType="numeric"
+          value={otp}
+          maxLength={6}
+          onChangeText={(text) => setOtp(text)}
+        />
+      </View>
+      <TouchableOpacity
+        style={[styles.buttonFormLogin, { marginBottom: 20, width: "90%" }]}
+        onPress={handleVerify}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color="white" />
+        ) : (
+          <Text style={[styles.buttonTextFormLogin, { fontSize: 18 }]}>
+            Verify
+          </Text>
+        )}
       </TouchableOpacity>
     </View>
-    <View style={styles.footer}>
-      <Text style={styles.footerText}>From</Text>
-      <Text style={styles.footerTitle}>Yayandev</Text>
-    </View>
-  </View>
-  )
-}
+  );
+};
 
-export default function LoginVIew({login,register}) {
+export default function LoginVIew({ login, verifyOtp }) {
   const [tab, setTab] = useState(0);
- 
+  const [phone, setPhone] = useState("");
+
   return (
     <>
-    {tab === 0 ? <TabOne setTab={setTab} /> : <TabTwo setTab={setTab} login={login} register={register} />}
+      {tab === 0 && <TabOne setTab={setTab} />}
+
+      {tab === 1 && (
+        <TabTwo
+          setTab={setTab}
+          login={login}
+          phone={phone}
+          setPhone={setPhone}
+        />
+      )}
+
+      {tab === 2 && (
+        <TabThree verifyOtp={verifyOtp} setTab={setTab} phone={phone} />
+      )}
     </>
   );
 }
@@ -180,16 +272,17 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     gap: 30,
     paddingHorizontal: 20,
-    width: "80%", 
+    width: "80%",
   },
   titleFormLogin: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
+    textAlign: "semicenter",
     paddingTop: 40,
   },
   inputFormLogin: {
-    borderWidth: 2,
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
     borderColor: "#00A884",
     borderRadius: 5,
     padding: 10,
@@ -215,5 +308,9 @@ const styles = StyleSheet.create({
     height: 100,
     alignSelf: "center",
     marginTop: 20,
+  },
+  titleTop: {
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });
