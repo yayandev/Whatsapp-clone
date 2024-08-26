@@ -7,6 +7,8 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Pressable,
+  Alert,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,8 +17,13 @@ import { router } from "expo-router";
 import { useAuth } from "./../context/AuthContext";
 import { db, storage } from "../utils/firebase.js";
 import { doc, setDoc } from "firebase/firestore";
-import { Toast, ALERT_TYPE } from "react-native-alert-notification";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { Toast, ALERT_TYPE, Dialog } from "react-native-alert-notification";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
 import * as ImagePicker from "expo-image-picker";
 
 export default function ProfileScreen() {
@@ -24,13 +31,14 @@ export default function ProfileScreen() {
   const { user, setUser } = useAuth();
   const [cameraVisible, setCameraVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const updateAvatarWithMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 4],
-      quality: 1,
+      quality: 0.5,
       selectionLimit: 1,
     });
 
@@ -103,7 +111,7 @@ export default function ProfileScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 4],
-      quality: 1,
+      quality: 0.5,
       selectionLimit: 1,
       legacy: true,
     });
@@ -127,6 +135,7 @@ export default function ProfileScreen() {
               textBody: error.message,
             });
             setLoading(false);
+            setCameraVisible(false);
           },
           async () => {
             try {
@@ -153,6 +162,7 @@ export default function ProfileScreen() {
               });
             } finally {
               setLoading(false);
+              setCameraVisible(false);
             }
           }
         );
@@ -165,6 +175,40 @@ export default function ProfileScreen() {
         setLoading(false);
       }
     }
+  }
+
+  async function DeleteAvatar() {
+    Dialog.show({
+      type: ALERT_TYPE.WARNING,
+      textBody: "Are you sure you want to delete your profile picture?",
+      button: "Delete",
+      onPressButton: async () => {
+        Dialog.hide();
+        setLoading(true);
+        const storageRef = ref(storage, "images/" + user?.phone);
+
+        const res = await deleteObject(storageRef);
+
+        console.log(res);
+
+        await setDoc(doc(db, "users", user?.phone), {
+          ...user,
+          avatar: null,
+        });
+
+        setUser({ ...user, avatar: null });
+
+        setLoading(false);
+
+        setCameraVisible(false);
+
+        Toast.show({
+          type: ALERT_TYPE.SUCCESS,
+          title: "Success",
+          textBody: "Profile picture deleted successfully",
+        });
+      },
+    });
   }
 
   useEffect(() => {
@@ -231,7 +275,11 @@ export default function ProfileScreen() {
             borderRadius: 50,
           }}
         >
-          <Ionicons name="camera" size={25} color="white" />
+          {loading ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Ionicons name="camera" size={25} color="white" />
+          )}
         </TouchableOpacity>
         <View style={{ gap: 10 }}>
           <View
@@ -340,9 +388,6 @@ export default function ProfileScreen() {
         >
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "space-around",
-              alignItems: "center",
               padding: 20,
               gap: 20,
               width: "100%",
@@ -351,43 +396,103 @@ export default function ProfileScreen() {
               borderTopRightRadius: 20,
             }}
           >
-            <TouchableOpacity
-              onPress={() => setCameraVisible(false)}
+            <View
               style={{
-                backgroundColor: "#008069",
-                padding: 10,
-                borderRadius: 50,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              <Ionicons name="close" size={40} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={takePicture}
-              style={{
-                backgroundColor: "#008069",
-                padding: 10,
-                borderRadius: 50,
-              }}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" size={"large"} />
-              ) : (
-                <Ionicons name="camera" size={40} color="white" />
+              <TouchableOpacity onPress={() => setCameraVisible(false)}>
+                <Ionicons name="close" size={30} color="black" />
+              </TouchableOpacity>
+              {user?.avatar && (
+                <TouchableOpacity onPress={DeleteAvatar}>
+                  <Ionicons name="trash" size={30} color="black" />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => updateAvatarWithMedia()}
+            </View>
+            <View
               style={{
-                backgroundColor: "#008069",
-                padding: 10,
-                borderRadius: 50,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              <Ionicons name="images" size={40} color="white" />
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "#008069",
+                  padding: 10,
+                  borderRadius: 50,
+                }}
+                onPress={() => setPreviewVisible(true)}
+              >
+                <Ionicons name="eye" size={40} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={takePicture}
+                style={{
+                  backgroundColor: "#008069",
+                  padding: 10,
+                  borderRadius: 50,
+                }}
+              >
+                <Ionicons name="camera" size={40} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => updateAvatarWithMedia()}
+                style={{
+                  backgroundColor: "#008069",
+                  padding: 10,
+                  borderRadius: 50,
+                }}
+              >
+                <Ionicons name="images" size={40} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* preview */}
+      <Modal visible={previewVisible} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View style={{ flexDirection: "column", gap: 10 }}>
+            <Image
+              source={
+                user?.avatar
+                  ? { uri: user?.avatar }
+                  : require("../assets/images/default.png")
+              }
+              resizeMode="contain"
+              style={{
+                aspectRatio: 1,
+                height: 300,
+                objectFit: "contain",
+                alignSelf: "center",
+                padding: 10,
+                backgroundColor: "white",
+                borderRadius: 10,
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => setPreviewVisible(false)}
+              style={{ alignSelf: "center" }}
+            >
+              <Ionicons name="close" size={40} color={"white"} />
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* modal edit name */}
     </ScrollView>
   );
 }
