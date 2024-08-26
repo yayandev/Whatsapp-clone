@@ -12,7 +12,7 @@ import {
 } from "react-native-popup-menu";
 
 export default function TabHeader({ index, routes, setIndex }) {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
