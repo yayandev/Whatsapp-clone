@@ -15,6 +15,7 @@ export default function ChatsView() {
 
   useEffect(() => {
     setLoading(false);
+    if (!user) return;
     const q = query(
       collection(db, "rooms"),
       where("participants", "array-contains", user?.phone)
@@ -27,7 +28,7 @@ export default function ChatsView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
   return (
     <>
       {loading && (

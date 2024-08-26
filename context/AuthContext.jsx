@@ -123,7 +123,6 @@ export const AuthProvider = ({ children }) => {
     setToken(data.data.token);
 
     if (data.success) {
-      setToken(data.data.token);
       const res = await fetch(`${API_URL}/verify-token`, {
         method: "POST",
         headers: {
