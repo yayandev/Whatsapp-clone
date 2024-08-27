@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
@@ -23,10 +24,14 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "../../utils/firebase";
+import { db, storage } from "../../utils/firebase";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { formatTimestamp } from "../../helpers/formatTimestamp";
 import EmojiSelector, { Categories } from "react-native-emoji-selector";
+import { Audio } from "expo-av";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { ALERT_TYPE, Toast } from "react-native-alert-notification";
+import MessageCard from "../../components/MessageCard";
 
 export default function RoomScreen() {
   const { id } = useLocalSearchParams();
@@ -40,6 +45,13 @@ export default function RoomScreen() {
   const scrollRef = useRef(null);
   const [isFirstRender, setIsFirstRender] = useState(true);
   const [showEmojiSelector, setShowEmojiSelector] = useState(false);
+  const [recording, setRecording] = useState();
+  const [permissionResponse, requestPermission] = Audio.usePermissions();
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [timer, setTimer] = useState(null);
+  const [loadingSendAudio, setLoadingSendAudio] = useState(false);
+
+  // get user & messages
   useEffect(() => {
     if (!id) return;
     const getUser2 = async () => {
@@ -69,6 +81,7 @@ export default function RoomScreen() {
     return () => unsubscribe();
   }, [id]);
 
+  // function sendMessage
   const sendMessage = async () => {
     if (!message) return;
 
@@ -84,10 +97,114 @@ export default function RoomScreen() {
     if (Keyboard.isVisible()) Keyboard.dismiss();
   };
 
+  // function startRecording
+  const startRecording = async () => {
+    try {
+      if (permissionResponse.status !== "granted") {
+        await requestPermission();
+      }
+
+      if (Keyboard.isVisible) {
+        Keyboard.dismiss();
+      }
+
+      if (showEmojiSelector) {
+        setShowEmojiSelector(false);
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording, status } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      // update recording time
+      const timer = setInterval(() => {
+        setRecordingTime((prevTime) => prevTime + 1);
+      }, 1000);
+
+      setTimer(timer);
+    } catch (err) {
+      console.error("Failed to start recording", err);
+    }
+  };
+
+  // function stopRecording
+  const stopRecording = async () => {
+    setRecording(undefined);
+    await recording.stopAndUnloadAsync();
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+    });
+    const uri = recording.getURI();
+
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    // send audio to server
+    const audioRef = ref(
+      storage,
+      `audios/${user.phone}/${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    );
+    const uploadTask = uploadBytesResumable(audioRef, blob);
+
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        setLoadingSendAudio(true);
+      },
+      (error) => {
+        Toast.show({
+          type: ALERT_TYPE.DANGER,
+          title: "Error",
+          textBody: "Failed to send audio",
+        });
+      },
+      async () => {
+        const url = await getDownloadURL(audioRef);
+
+        addDoc(collection(db, "rooms", id, "messages"), {
+          audio: url,
+          sender: user.phone,
+          timestamp: serverTimestamp(),
+          read: false,
+          duration: recordingTime,
+        });
+
+        setLoadingSendAudio(false);
+      }
+    );
+
+    setRecordingTime(0);
+    clearInterval(timer);
+    setTimer(null);
+    setLoadingSendAudio(false);
+  };
+
+  // function cancelSendAudio
+  const cancelSendAudio = async () => {
+    if (recording) {
+      setRecording(undefined);
+      await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      setRecordingTime(0);
+      clearInterval(timer);
+      setTimer(null);
+    }
+  };
+
+  // scroll to end
   const handleScrollToEnd = () => {
     scrollRef.current?.scrollToEnd({ animated: false });
   };
 
+  // scroll to end
   useLayoutEffect(() => {
     if (isFirstRender) {
       handleScrollToEnd();
@@ -96,6 +213,7 @@ export default function RoomScreen() {
       handleScrollToEnd();
     }
   }, [messages]);
+
   return (
     <View
       style={{
@@ -161,63 +279,7 @@ export default function RoomScreen() {
           }}
         >
           {messages?.map((message, index) => (
-            <View
-              key={index}
-              style={{
-                padding: 8,
-                borderRadius: 8,
-                backgroundColor: "#E7FFDB",
-                marginBottom: 10,
-                maxWidth: "80%",
-                alignSelf:
-                  message?.sender === user?.phone ? "flex-end" : "flex-start",
-                minWidth: 100,
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>
-                {message?.text && message?.text.length > 40
-                  ? message?.text.slice(0, 40) + "..."
-                  : message?.text}
-              </Text>
-              {message?.sender !== user.phone ? (
-                <Text
-                  style={{
-                    fontWeight: "500",
-                    fontSize: 12,
-                    color: "gray",
-                    alignSelf: "flex-end",
-                  }}
-                >
-                  {formatTimestamp(message?.timestamp)}
-                </Text>
-              ) : (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 5,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <Ionicons
-                    name={"checkmark-done"}
-                    size={18}
-                    color={message?.read ? "skyblue" : "gray"}
-                    style={{ alignSelf: "flex-end" }}
-                  />
-
-                  <Text
-                    style={{
-                      fontWeight: "500",
-                      fontSize: 12,
-                      color: "gray",
-                      alignSelf: "flex-end",
-                    }}
-                  >
-                    {formatTimestamp(message?.timestamp)}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <MessageCard key={index} message={message} user={user} />
           ))}
         </View>
       </ScrollView>
@@ -233,55 +295,98 @@ export default function RoomScreen() {
             gap: 10,
           }}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              backgroundColor: "white",
-              padding: 15,
-              borderRadius: 50,
-              flex: 1,
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => {
-                if (Keyboard.isVisible()) {
-                  Keyboard.dismiss();
-                }
-                setShowEmojiSelector(!showEmojiSelector);
+          {recording ? (
+            // recording view
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                backgroundColor: "white",
+                padding: 15,
+                borderRadius: 50,
+                flex: 1,
               }}
             >
-              <MaterialCommunityIcons
-                name="emoticon-happy-outline"
-                size={24}
-                color="black"
-              />
-            </TouchableOpacity>
-            <TextInput
-              placeholder="Type a message"
+              <TouchableOpacity onPress={() => cancelSendAudio()}>
+                <Ionicons name="trash" size={24} color="black" />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 16 }}>Recording... {recordingTime}</Text>
+            </View>
+          ) : (
+            // message view
+            <View
               style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                backgroundColor: "white",
+                padding: 15,
+                borderRadius: 50,
                 flex: 1,
-                fontSize: 16,
               }}
-              value={message}
-              onChangeText={(text) => setMessage(text)}
-              onFocus={() => {
-                if (showEmojiSelector) setShowEmojiSelector(false);
-                scrollRef.current?.scrollToEnd({ animated: true });
+            >
+              <TouchableOpacity
+                onPress={() => {
+                  if (Keyboard.isVisible()) {
+                    Keyboard.dismiss();
+                  }
+                  setShowEmojiSelector(!showEmojiSelector);
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="emoticon-happy-outline"
+                  size={24}
+                  color="black"
+                />
+              </TouchableOpacity>
+              <TextInput
+                placeholder="Type a message"
+                style={{
+                  flex: 1,
+                  fontSize: 16,
+                }}
+                value={message}
+                onChangeText={(text) => setMessage(text)}
+                onFocus={() => {
+                  if (showEmojiSelector) setShowEmojiSelector(false);
+                  scrollRef.current?.scrollToEnd({ animated: true });
+                }}
+              />
+            </View>
+          )}
+          {message?.length > 0 ? (
+            <TouchableOpacity
+              onPress={sendMessage}
+              style={{
+                backgroundColor: "#008069",
+                padding: 15,
+                borderRadius: 50,
               }}
-            />
-          </View>
-          <TouchableOpacity
-            onPress={sendMessage}
-            style={{
-              backgroundColor: "#008069",
-              padding: 15,
-              borderRadius: 50,
-            }}
-          >
-            <Ionicons name="send" size={24} color="white" />
-          </TouchableOpacity>
+            >
+              <Ionicons name="send" size={24} color="white" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={recording ? stopRecording : startRecording}
+              style={{
+                backgroundColor: "#008069",
+                padding: 15,
+                borderRadius: 50,
+              }}
+              disabled={loadingSendAudio}
+            >
+              {loadingSendAudio ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons
+                  name={recording ? "send" : "mic"}
+                  size={24}
+                  color="white"
+                />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
         {showEmojiSelector && (
           <View

@@ -134,26 +134,32 @@ const CardRoom = ({ room }) => {
         />
         <View>
           <Text style={{ fontWeight: "500", fontSize: 18 }}>{user2?.name}</Text>
-          {lastMessage?.sender !== user.phone ? (
-            <Text style={{ fontSize: 12, color: "gray" }}>
-              {lastMessage?.text && lastMessage?.text.length > 40
-                ? lastMessage?.text.slice(0, 40) + "..."
-                : lastMessage?.text}
-            </Text>
-          ) : (
-            <View style={{ flexDirection: "row", gap: 5 }}>
+          <View style={{ flexDirection: "row", gap: 5 }}>
+            {lastMessage?.sender === user.phone && (
               <Ionicons
                 name={"checkmark-done"}
                 size={18}
                 color={lastMessage?.read ? "skyblue" : "gray"}
               />
+            )}
+            {lastMessage?.text && (
               <Text style={{ fontSize: 12, color: "gray" }}>
                 {lastMessage?.text && lastMessage?.text.length > 40
                   ? lastMessage?.text.slice(0, 40) + "..."
                   : lastMessage?.text}
               </Text>
-            </View>
-          )}
+            )}
+            {lastMessage?.audio && (
+              <View style={{ flexDirection: "row", gap: 5 }}>
+                <Ionicons name="mic" size={18} color="gray" />
+                <Text>
+                  {lastMessage?.duration && lastMessage?.duration > 60
+                    ? Math.floor(lastMessage?.duration / 60) + "m"
+                    : lastMessage?.duration + "s"}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
       <View>

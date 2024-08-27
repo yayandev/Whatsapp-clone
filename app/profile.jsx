@@ -223,8 +223,6 @@ export default function ProfileScreen() {
 
         const res = await deleteObject(storageRef);
 
-        console.log(res);
-
         await setDoc(doc(db, "users", user?.phone), {
           ...user,
           avatar: null,

@@ -61,8 +61,6 @@ const TabTwo = ({ setTab, login, phone, setPhone }) => {
 
     const response = await login(phone);
 
-    console.log(response);
-
     if (response.success) {
       setTab(2);
     } else {
