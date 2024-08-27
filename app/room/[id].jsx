@@ -340,19 +340,27 @@ export default function RoomScreen() {
                   color="black"
                 />
               </TouchableOpacity>
-              <TextInput
-                placeholder="Type a message"
-                style={{
-                  flex: 1,
-                  fontSize: 16,
-                }}
-                value={message}
-                onChangeText={(text) => setMessage(text)}
-                onFocus={() => {
-                  if (showEmojiSelector) setShowEmojiSelector(false);
-                  scrollRef.current?.scrollToEnd({ animated: true });
-                }}
-              />
+              <View style={{ flex: 1, flexDirection: "row", gap: 5 }}>
+                <TextInput
+                  placeholder="Type a message"
+                  style={{
+                    flex: 1,
+                    fontSize: 16,
+                    maxHeight: 50,
+                  }}
+                  value={message}
+                  onChangeText={(text) => setMessage(text)}
+                  onFocus={() => {
+                    if (showEmojiSelector) setShowEmojiSelector(false);
+                    scrollRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  scrollEnabled
+                  multiline
+                />
+                <TouchableOpacity>
+                  <Ionicons name="attach" size={24} color="black" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           {message?.length > 0 ? (
