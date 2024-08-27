@@ -2,33 +2,27 @@ import { View, Text, TouchableOpacity } from "react-native";
 import React, { useEffect, useState } from "react";
 import { formatTimestamp } from "../helpers/formatTimestamp";
 import { Ionicons } from "@expo/vector-icons";
-
 import { Audio } from "expo-av";
 
 export default function MessageCard({ message, user }) {
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [sound, setSound] = useState();
   const [duration, setDuration] = useState(0);
-  const [status, setStatus] = useState({});
 
   async function playSound() {
-    if (!sound) {
-      return;
-    }
-    setAudioIsPlaying(true);
-    await sound.playAsync();
+    if (!sound) return;
 
-    const durationOld = duration;
-
-    const timer = setInterval(() => {
-      setDuration(duration - 1);
-    }, Number(durationOld) * 1000);
-
-    setTimeout(() => {
+    if (audioIsPlaying) {
+      await sound.stopAsync();
       setAudioIsPlaying(false);
-      setDuration(durationOld);
-      clearInterval(timer);
-    }, Number(duration) * 1000);
+    } else {
+      await sound.playAsync();
+      setAudioIsPlaying(true);
+
+      setTimeout(() => {
+        setAudioIsPlaying(false);
+      }, Number(duration) * 1000);
+    }
   }
 
   useEffect(() => {
@@ -39,7 +33,6 @@ export default function MessageCard({ message, user }) {
       : undefined;
   }, [sound]);
 
-  //   get audio & duration
   useEffect(() => {
     if (!message?.audio) return;
 
@@ -49,9 +42,7 @@ export default function MessageCard({ message, user }) {
       });
 
       setSound(sound);
-
       setDuration((status.durationMillis / 1000).toFixed(0));
-      setStatus(status);
     };
 
     getAudio();
@@ -78,7 +69,7 @@ export default function MessageCard({ message, user }) {
       {/* message text */}
       {message?.text && (
         <Text style={{ fontSize: 16 }}>
-          {message?.text && message?.text.length > 40
+          {message?.text.length > 40
             ? message?.text.slice(0, 40) + "..."
             : message?.text}
         </Text>
@@ -87,15 +78,7 @@ export default function MessageCard({ message, user }) {
       {/* message audio */}
       {message?.audio && (
         <View style={{ flexDirection: "row", gap: 5 }}>
-          <TouchableOpacity
-            onPress={() => {
-              if (audioIsPlaying) {
-                sound.unloadAsync();
-              } else {
-                playSound();
-              }
-            }}
-          >
+          <TouchableOpacity onPress={playSound}>
             <Ionicons
               name={audioIsPlaying ? "pause" : "play"}
               size={24}
