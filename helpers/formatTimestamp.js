@@ -15,10 +15,9 @@ export const formatTimestamp = (timestamp) => {
     });
   } else {
     // Jika pesan dikirim sebelum hari ini, tampilkan tanggal
-    return messageDate.toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+    return messageDate.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 };

@@ -26,12 +26,17 @@ import {
 } from "firebase/firestore";
 import { db, storage } from "../../utils/firebase";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { formatTimestamp } from "../../helpers/formatTimestamp";
 import EmojiSelector, { Categories } from "react-native-emoji-selector";
 import { Audio } from "expo-av";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { ALERT_TYPE, Toast } from "react-native-alert-notification";
 import MessageCard from "../../components/MessageCard";
+import {
+  Menu,
+  MenuOption,
+  MenuOptions,
+  MenuTrigger,
+} from "react-native-popup-menu";
 
 export default function RoomScreen() {
   const { id } = useLocalSearchParams();
@@ -50,6 +55,10 @@ export default function RoomScreen() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [timer, setTimer] = useState(null);
   const [loadingSendAudio, setLoadingSendAudio] = useState(false);
+
+  // replay message
+  const [reply, setReply] = useState(null);
+  const inputRef = useRef(null);
 
   // get user & messages
   useEffect(() => {
@@ -90,8 +99,10 @@ export default function RoomScreen() {
       sender: user.phone,
       timestamp: serverTimestamp(),
       read: false,
+      reply: reply ? reply : null,
     });
 
+    setReply(null);
     setMessage("");
     if (showEmojiSelector) setShowEmojiSelector(false);
     if (Keyboard.isVisible()) Keyboard.dismiss();
@@ -172,8 +183,10 @@ export default function RoomScreen() {
           timestamp: serverTimestamp(),
           read: false,
           duration: recordingTime,
+          reply: reply ? reply : null,
         });
 
+        setReply(null);
         setLoadingSendAudio(false);
       }
     );
@@ -225,6 +238,7 @@ export default function RoomScreen() {
       }}
     >
       <StatusBar style="light" backgroundColor="#008069" />
+      {/* header */}
       <View
         style={{
           width: "100%",
@@ -258,10 +272,41 @@ export default function RoomScreen() {
             {user2?.name}
           </Text>
         </View>
-        <TouchableOpacity>
-          <Ionicons name="ellipsis-vertical" size={24} color="white" />
-        </TouchableOpacity>
+        <Menu>
+          <MenuTrigger>
+            <Ionicons name="ellipsis-vertical" size={24} color="white" />
+          </MenuTrigger>
+          <MenuOptions
+            customStyles={{
+              optionsContainer: {
+                backgroundColor: "white",
+                borderRadius: 10,
+                padding: 10,
+                width: 200,
+                marginTop: 30,
+              },
+              optionWrapper: {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+              },
+            }}
+          >
+            <MenuOption onSelect={() => {}}>
+              <Text
+                style={{
+                  color: "black",
+                  fontWeight: "semibold",
+                  fontSize: 16,
+                }}
+              >
+                Profile
+              </Text>
+            </MenuOption>
+          </MenuOptions>
+        </Menu>
       </View>
+      {/* messages */}
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -275,16 +320,118 @@ export default function RoomScreen() {
         <View
           style={{
             flex: 1,
-            padding: 10,
           }}
         >
-          {messages?.map((message, index) => (
-            <MessageCard key={index} message={message} user={user} />
-          ))}
+          {/* message map */}
+          {messages?.map((message, index) => {
+            // message date logic
+            const dateMessage = new Date(message.timestamp?.toDate());
+            const previousMessage = messages[index - 1];
+            const previousDateMessage = previousMessage
+              ? new Date(previousMessage.timestamp?.toDate())
+              : null;
+            const isNewDay =
+              !previousDateMessage ||
+              dateMessage.toDateString() !== previousDateMessage.toDateString();
+
+            return (
+              <View key={index}>
+                {isNewDay && (
+                  <View
+                    style={{
+                      padding: 10,
+                      backgroundColor: "#E5E5E5",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        fontSize: 14,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {dateMessage.toLocaleDateString("id-ID", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </Text>
+                  </View>
+                )}
+
+                <MessageCard
+                  reply={reply}
+                  setReply={setReply}
+                  message={message}
+                  user={user}
+                  inputRef={inputRef}
+                  user2={user2}
+                />
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
       {/* form send message */}
       <View>
+        {/* replay message view */}
+        {reply && (
+          <View
+            style={{
+              padding: 10,
+              backgroundColor: "white",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              gap: 10,
+              borderRadius: 10,
+              width: "80%",
+              marginLeft: 15,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+              }}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 8,
+                  borderLeftWidth: 3,
+                  borderLeftColor: "#008069",
+                }}
+              >
+                <Text style={{ fontSize: 12, color: "#008069" }}>
+                  {reply?.sender === user?.phone ? "You" : user2?.name}
+                </Text>
+                {reply?.text && (
+                  <Text style={{ fontSize: 16, color: "gray" }}>
+                    {reply?.text}
+                  </Text>
+                )}
+                {reply?.audio && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 5,
+                    }}
+                  >
+                    <Ionicons name="play" size={20} color="gray" />
+                    <Text style={{ fontSize: 14, color: "gray" }}>
+                      {reply?.duration > 60
+                        ? (reply?.duration / 60).toFixed(0) + "m"
+                        : reply?.duration + "s"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setReply(null)}>
+              <Ionicons name="close" size={24} color="black" />
+            </TouchableOpacity>
+          </View>
+        )}
         <View
           style={{
             width: "100%",
@@ -342,6 +489,7 @@ export default function RoomScreen() {
               </TouchableOpacity>
               <View style={{ flex: 1, flexDirection: "row", gap: 5 }}>
                 <TextInput
+                  ref={inputRef}
                   placeholder="Type a message"
                   style={{
                     flex: 1,
@@ -357,9 +505,56 @@ export default function RoomScreen() {
                   scrollEnabled
                   multiline
                 />
-                <TouchableOpacity>
-                  <Ionicons name="attach" size={24} color="black" />
-                </TouchableOpacity>
+
+                <Menu>
+                  <MenuTrigger>
+                    <Ionicons name="attach" size={24} color="black" />
+                  </MenuTrigger>
+                  <MenuOptions
+                    optionsContainerStyle={{
+                      padding: 15,
+                      backgroundColor: "white",
+                      borderRadius: 10,
+                      width: "auto",
+                      marginTop: -50,
+                      alignItems: "center",
+                      marginLeft: -50,
+                    }}
+                  >
+                    <MenuOption
+                      onSelect={() => {}}
+                      style={{
+                        padding: 10,
+                        backgroundColor: "#008069",
+                        borderRadius: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Ionicons name="image" size={24} color="white" />
+                    </MenuOption>
+                    <MenuOption
+                      onSelect={() => {}}
+                      style={{
+                        padding: 10,
+                        backgroundColor: "#008069",
+                        borderRadius: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Ionicons name="camera" size={24} color="white" />
+                    </MenuOption>
+                    <MenuOption
+                      onSelect={() => {}}
+                      style={{
+                        padding: 10,
+                        backgroundColor: "#008069",
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Ionicons name="person" size={24} color="white" />
+                    </MenuOption>
+                  </MenuOptions>
+                </Menu>
               </View>
             </View>
           )}
