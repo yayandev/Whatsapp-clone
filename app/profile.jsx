@@ -7,8 +7,8 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
-  Pressable,
   Alert,
+  TextInput,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,6 +32,40 @@ export default function ProfileScreen() {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [changeNameVisible, setChangeNameVisible] = useState(false);
+  const [name, setName] = useState(user?.name || "");
+  const [changeBioVisible, setChangeBioVisible] = useState(false);
+  const [bio, setBio] = useState(user?.bio || "");
+
+  const updateName = async () => {
+    await setDoc(doc(db, "users", user.phone), {
+      ...user,
+      name,
+    });
+
+    setUser({ ...user, name });
+    setChangeNameVisible(false);
+    Toast.show({
+      type: ALERT_TYPE.SUCCESS,
+      title: "Success",
+      textBody: "Name updated successfully",
+    });
+  };
+
+  const updateBio = async () => {
+    await setDoc(doc(db, "users", user.phone), {
+      ...user,
+      bio,
+    });
+
+    setUser({ ...user, bio });
+    setChangeBioVisible(false);
+    Toast.show({
+      type: ALERT_TYPE.SUCCESS,
+      title: "Success",
+      textBody: "Info updated successfully",
+    });
+  };
 
   const updateAvatarWithMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -306,7 +340,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setChangeNameVisible(true)}>
               <Ionicons name="pencil-sharp" size={25} color="#008069" />
             </TouchableOpacity>
           </View>
@@ -338,7 +372,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setChangeBioVisible(true)}>
               <Ionicons name="pencil-sharp" size={25} color="#008069" />
             </TouchableOpacity>
           </View>
@@ -371,6 +405,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
       {/* Camera */}
       <Modal
         onTouchCancel={() => setCameraVisible(false)}
@@ -493,6 +528,140 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* modal edit name */}
+      <Modal visible={changeNameVisible} animationType="slide" transparent>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "white",
+              padding: 20,
+              borderRadius: 10,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setChangeNameVisible(false)}
+              style={{ alignSelf: "flex-end" }}
+            >
+              <Ionicons name="close" size={30} color="black" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "600",
+                textAlign: "center",
+                marginBottom: 20,
+              }}
+            >
+              Edit Name
+            </Text>
+            <TextInput
+              value={name}
+              onChangeText={(text) => setName(text)}
+              placeholder="Enter your name"
+              style={{
+                borderWidth: 1,
+                borderColor: "#ddd",
+                padding: 10,
+                borderRadius: 5,
+              }}
+            />
+            <TouchableOpacity
+              onPress={updateName}
+              style={{
+                backgroundColor: "#008069",
+                padding: 10,
+                borderRadius: 5,
+                marginTop: 20,
+              }}
+            >
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: "white",
+                  fontWeight: "600",
+                }}
+              >
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* modal edit info */}
+      <Modal visible={changeBioVisible} animationType="slide" transparent>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "white",
+              padding: 20,
+              borderRadius: 10,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setChangeBioVisible(false)}
+              style={{ alignSelf: "flex-end" }}
+            >
+              <Ionicons name="close" size={30} color="black" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "600",
+                textAlign: "center",
+                marginBottom: 20,
+              }}
+            >
+              Edit Info
+            </Text>
+            <TextInput
+              value={bio}
+              onChangeText={(text) => setBio(text)}
+              placeholder="Enter your info"
+              style={{
+                borderWidth: 1,
+                borderColor: "#ddd",
+                padding: 10,
+                borderRadius: 5,
+              }}
+              maxLength={50}
+            />
+            <TouchableOpacity
+              onPress={updateBio}
+              style={{
+                backgroundColor: "#008069",
+                padding: 10,
+                borderRadius: 5,
+                marginTop: 20,
+              }}
+            >
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: "white",
+                  fontWeight: "600",
+                }}
+              >
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

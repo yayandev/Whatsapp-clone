@@ -13,6 +13,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Contacts from "expo-contacts";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { db } from "./../utils/firebase";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import { ALERT_TYPE, Toast } from "react-native-alert-notification";
+import { useAuth } from "./../context/AuthContext";
 
 export default function ContactsScreen() {
   const paddingTop = useSafeAreaInsets().top;
@@ -22,6 +36,8 @@ export default function ContactsScreen() {
   const [loading, setLoading] = useState(true);
   const [visibleModal, setVisibleModal] = useState(false);
   const [contact, setContact] = useState({});
+  const { user } = useAuth();
+  const [loadingCreateRoom, setLoadingCreateRoom] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -45,6 +61,53 @@ export default function ContactsScreen() {
   const showContactInModal = (contact) => {
     setVisibleModal(true);
     setContact(contact);
+  };
+
+  const createRoom = async (contact) => {
+    let phone = contact.phoneNumbers[0].number;
+
+    if (phone.startsWith("+")) {
+      phone = phone.slice(1);
+    }
+
+    if (phone.startsWith("0")) {
+      phone = `62${phone.slice(1)}`;
+    }
+
+    if (phone === user?.phone) {
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: "You can't chat with yourself",
+      });
+      setVisibleModal(false);
+      return;
+    }
+
+    setLoadingCreateRoom(true);
+
+    const participantsKey = [phone, user?.phone].sort().join("_");
+    const roomRef = doc(db, "rooms", participantsKey);
+
+    const roomExists = await getDoc(roomRef);
+
+    if (roomExists.exists()) {
+      router.push(`/room/${roomRef.id}`);
+      setVisibleModal(false);
+      setLoadingCreateRoom(false);
+    } else {
+      await setDoc(roomRef, {
+        participants: [phone, user?.phone],
+        timestamp: serverTimestamp(),
+      });
+
+      router.push(`/room/${roomRef.id}`);
+
+      setLoadingCreateRoom(false);
+    }
+
+    setVisibleModal(false);
+    setLoadingCreateRoom(false);
   };
 
   return (
@@ -208,6 +271,7 @@ export default function ContactsScreen() {
               {contact?.phoneNumbers?.[0]?.number || "No phone number"}
             </Text>
             <TouchableOpacity
+              onPress={() => createRoom(contact)}
               style={{
                 backgroundColor: "#008069",
                 padding: 10,
@@ -217,7 +281,11 @@ export default function ContactsScreen() {
                 width: "100%",
               }}
             >
-              <Text style={{ color: "white" }}>Chat</Text>
+              {loadingCreateRoom ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={{ color: "white" }}>Chat</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

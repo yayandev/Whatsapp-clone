@@ -14,7 +14,6 @@ export default function ChatsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(false);
     if (!user) return;
     const q = query(
       collection(db, "rooms"),
@@ -25,6 +24,7 @@ export default function ChatsView() {
       setRooms(
         querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
       );
+      setLoading(false);
     });
 
     return () => unsubscribe();
