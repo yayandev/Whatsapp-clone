@@ -7,7 +7,7 @@ import ChatsView from "./tabs/ChatsView";
 import StatusView from "./tabs/StatusView";
 import CallsView from "./tabs/CallsView";
 
-export default function TabLayout() {
+export default function HomeView() {
   const layout = useWindowDimensions();
 
   const [index, setIndex] = useState(0);

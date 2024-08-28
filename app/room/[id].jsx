@@ -336,7 +336,7 @@ export default function RoomScreen() {
 
             return (
               <View key={index}>
-                {isNewDay && (
+                {isNewDay && dateMessage && (
                   <View
                     style={{
                       padding: 10,
@@ -351,7 +351,7 @@ export default function RoomScreen() {
                         fontWeight: "500",
                       }}
                     >
-                      {dateMessage.toLocaleDateString("id-ID", {
+                      {dateMessage?.toLocaleDateString("id-ID", {
                         weekday: "long",
                         year: "numeric",
                         month: "long",

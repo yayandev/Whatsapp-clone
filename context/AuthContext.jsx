@@ -15,7 +15,7 @@ const AuthContext = createContext({
 });
 
 export const useAuth = () => useContext(AuthContext);
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = "https://api-whatsapp-clone.yayandev.com";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -24,57 +24,75 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const init = async () => {
-      const token = await AsyncStorage.getItem("token");
+      try {
+        const token = await AsyncStorage.getItem("token");
 
-      if (token) {
-        const res = await fetch(`${API_URL}/verify-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-access-token": token,
-          },
-        });
+        if (token) {
+          const res = await fetch(`${API_URL}/verify-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-access-token": token,
+            },
+          });
 
-        const data = await res.json();
+          const data = await res.json();
 
-        if (data.success) {
-          setUser(data.data.user);
-          setToken(token);
-          setLoading(false);
-          return;
+          if (data.success) {
+            setUser(data.data.user);
+            setToken(token);
+            setLoading(false);
+            return;
+          }
         }
-      }
 
-      setUser(null);
-      setToken(null);
-      setLoading(false);
+        setUser(null);
+        setToken(null);
+        setLoading(false);
+      } catch (error) {
+        console.warn(error);
+        Toast.show({
+          type: ALERT_TYPE.DANGER,
+          title: "Error",
+          textBody: error.message,
+        });
+      }
     };
 
     init();
   }, []);
 
   const login = async (phone) => {
-    const API_URL = process.env.EXPO_PUBLIC_API_URL;
+    try {
+      const API_URL = "https://api-whatsapp-clone.yayandev.com";
 
-    if (phone.startsWith("0")) {
-      phone = `62${phone.slice(1)}`;
+      if (phone.startsWith("0")) {
+        phone = `62${phone.slice(1)}`;
+      }
+
+      if (!phone.startsWith("0") && !phone.startsWith("62")) {
+        phone = `62${phone}`;
+      }
+
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phone }),
+      });
+
+      const data = await res.json();
+
+      return data;
+    } catch (error) {
+      console.warn(error);
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: error.message,
+      });
     }
-
-    if (!phone.startsWith("0") && !phone.startsWith("62")) {
-      phone = `62${phone}`;
-    }
-
-    const res = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ phone }),
-    });
-
-    const data = await res.json();
-
-    return data;
   };
 
   const logout = async () => {
@@ -96,54 +114,63 @@ export const AuthProvider = ({ children }) => {
   };
 
   const verifyOtp = async (phone, otp) => {
-    if (phone.startsWith("0")) {
-      phone = `62${phone.slice(1)}`;
-    }
+    try {
+      if (phone.startsWith("0")) {
+        phone = `62${phone.slice(1)}`;
+      }
 
-    if (!phone.startsWith("0") && !phone.startsWith("62")) {
-      phone = `62${phone}`;
-    }
+      if (!phone.startsWith("0") && !phone.startsWith("62")) {
+        phone = `62${phone}`;
+      }
 
-    const body = {
-      phone,
-      otp,
-    };
+      const body = {
+        phone,
+        otp,
+      };
 
-    const res = await fetch(`${API_URL}/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-
-    await AsyncStorage.setItem("token", data.data.token);
-    setToken(data.data.token);
-
-    if (data.success) {
-      const res = await fetch(`${API_URL}/verify-token`, {
+      const res = await fetch(`${API_URL}/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-access-token": data.data.token,
         },
+        body: JSON.stringify(body),
       });
 
-      const data2 = await res.json();
+      const data = await res.json();
 
-      if (data2.success) {
-        setUser(data2.data.user);
-        return;
+      await AsyncStorage.setItem("token", data.data.token);
+      setToken(data.data.token);
+
+      if (data.success) {
+        const res = await fetch(`${API_URL}/verify-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-access-token": data.data.token,
+          },
+        });
+
+        const data2 = await res.json();
+
+        if (data2.success) {
+          setUser(data2.data.user);
+          return;
+        }
       }
-    }
 
-    Toast.show({
-      type: ALERT_TYPE.DANGER,
-      title: "Error",
-      textBody: data.message,
-    });
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: data.message,
+      });
+    } catch (error) {
+      console.warn(error);
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: error.message,
+      });
+    }
   };
 
   if (loading) {

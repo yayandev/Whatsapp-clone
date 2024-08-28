@@ -46,7 +46,13 @@ export default function ContactsScreen() {
         const { data } = await Contacts.getContactsAsync();
 
         if (data.length > 0) {
-          setContacts(data);
+          // filter lalu assign ke state contacts
+          const filteredContacts = data.filter(
+            (contact) => contact.phoneNumbers && contact.phoneNumbers.length > 0
+          );
+
+          setContacts(filteredContacts);
+
           setLoading(false);
         }
       }
@@ -85,6 +91,19 @@ export default function ContactsScreen() {
     }
 
     setLoadingCreateRoom(true);
+
+    const userExists = await getDoc(doc(db, "users", phone));
+
+    if (!userExists.exists()) {
+      Toast.show({
+        type: ALERT_TYPE.DANGER,
+        title: "Error",
+        textBody: "Nomor telepon tidak terdaftar!",
+      });
+      setLoadingCreateRoom(false);
+      setVisibleModal(false);
+      return;
+    }
 
     const participantsKey = [phone, user?.phone].sort().join("_");
     const roomRef = doc(db, "rooms", participantsKey);
